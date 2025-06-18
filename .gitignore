@@ -1,0 +1,18 @@
+# 编译输出目录
+build/
+bin/
+
+# 编译产生的中间文件
+*.o
+*.out
+
+# VS Code 编辑器配置文件
+.vscode/
+
+# 系统临时文件
+*.swp
+*.DS_Store
+
+# 其他可能的临时文件
+*.log
+*.tmp
