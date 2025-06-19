@@ -1,5 +1,3 @@
-#pragma once
-
 #include "connection_pool.h"
 #include "public.h"
 
@@ -76,5 +74,45 @@ ConnectionPool::ConnectionPool(){
     }
 
     // 启动新线程，作为连接生产者1
+    thread produce(std::bind(&ConnectionPool::produceConnectionTask, this));
 
+}
+
+void ConnectionPool::produceConnectionTask(){
+    // 每隔一段时间，检查连接池中的连接数量，如果数量小于最大连接数，则创建新的连接
+    while(true){
+        unique_lock<mutex> lock(queueMutex_);
+        while(!connectionQueue_.empty()){
+            condition_.wait(lock); // 等待条件变量
+        }
+
+        // 数量没有到上限，则创建新连接
+        if(connectionCount_ < maxSize_){
+            Connection *conn = new Connection();
+            conn->connect(ip_, port_, username_, password_, dbname_);
+            connectionQueue_.push(conn);
+            connectionCount_++;
+        }
+    }
+
+    // 通知消费者线程，连接池有新连接了，可以消费连接了
+    condition_.notify_all();
+}
+
+shared_ptr<Connection> ConnectionPool::getConnection(){
+    // 获取连接，如果连接池为空，则等待
+    unique_lock<mutex> lock(queueMutex_);
+    while(connectionQueue_.empty()){
+        condition_.wait_for(lock, chrono::milliseconds(connectionTimeout_));
+        if(connectionQueue_.empty()){
+            LOG("the connection acquisition timeout occurs");
+            return nullptr;
+        }
+    }
+    // 获取连接
+    shared_ptr<Connection> conn(connectionQueue_.front());
+    connectionQueue_.pop();
+    //消费完毕，通知生产者
+    condition_.notify_all();
+    return conn;
 }
