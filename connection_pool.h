@@ -5,24 +5,30 @@
 #include <mysql/mysql.h>
 #include <mutex>
 #include <atomic>
-#include<queue>
+#include <memory>
+#include <thread>
+#include <functional>
+#include <queue>
+#include <condition_variable>
 
 class ConnectionPool
 {
 public:
     // 获取连接池对象
     static ConnectionPool* getConnectionPool();
-    MYSQL *getConnection();
+    // 获取一个数据库连接
+    shared_ptr<Connection> getConnection();
     void releaseConnection(MYSQL *conn);
     void destory();
 
 private:
     // 单例模式,私有化构造函数，
     ConnectionPool();
-    // 
     ~ConnectionPool();
-    //从配置文件中加载配置项
+    // 从配置文件中加载配置项
     bool loadConfigFile(); 
+    // 创建数据库连接,运行在独立的线程之中
+    void produceConnectionTask();
     void init(string url, string user, string password, string dbname, int port, int maxConn);
     Connection *getFreeConnection();
 
@@ -42,4 +48,5 @@ private:
     queue<Connection*> connectionQueue_;// 连接队列
     mutex queueMutex_;     // 连接队列的线程安全互斥锁
     atomic_int connectionCount_; // 连接池中当前连接总数
+    condition_variable condition_; // 条件变量
 };
