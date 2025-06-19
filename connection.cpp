@@ -1,6 +1,5 @@
 #include "public.h"
 #include "connection.h"
-
 using namespace std;
 
 Connection::Connection(){

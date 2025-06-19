@@ -1,5 +1,7 @@
 #include "connection_pool.h"
+#include "connection.h"
 #include "public.h"
+#include <mutex>
 
 ConnectionPool* ConnectionPool::getConnectionPool(){
     //线程安全的懒汉单单例子模式
@@ -69,13 +71,18 @@ ConnectionPool::ConnectionPool(){
     for(int i = 0; i < initSize_; ++i){
         Connection* conn = new Connection;
         conn->connect(ip_, port_, username_, password_, dbname_);
+        conn->refreshAliveTime(); // 刷新连接存活时间
         connectionQueue_.push(conn);
         connectionCount_++;
     }
 
     // 启动新线程，作为连接生产者1
     thread produce(std::bind(&ConnectionPool::produceConnectionTask, this));
+    produce.detach();
 
+    // 启动新线程，扫描连接池中的连接，如果连接存活时间超过最大空闲时间，则关闭连接
+    thread scanner(std::bind(&ConnectionPool::scannerConnectionTask, this));
+    scanner.detach();
 }
 
 void ConnectionPool::produceConnectionTask(){
@@ -90,6 +97,7 @@ void ConnectionPool::produceConnectionTask(){
         if(connectionCount_ < maxSize_){
             Connection *conn = new Connection();
             conn->connect(ip_, port_, username_, password_, dbname_);
+            conn->refreshAliveTime();
             connectionQueue_.push(conn);
             connectionCount_++;
         }
@@ -110,9 +118,38 @@ shared_ptr<Connection> ConnectionPool::getConnection(){
         }
     }
     // 获取连接
-    shared_ptr<Connection> conn(connectionQueue_.front());
+    shared_ptr<Connection> conn(connectionQueue_.front(), [&](Connection *conn_){
+        //连接使用完毕，归还连接
+        unique_lock<mutex> lock(queueMutex_);
+        conn_->refreshAliveTime();
+        connectionQueue_.push(conn_);
+    });
     connectionQueue_.pop();
     //消费完毕，通知生产者
     condition_.notify_all();
     return conn;
+}
+
+void ConnectionPool::scannerConnectionTask(){
+    //扫描超时的连接
+    while(true){
+        //休眠一段时间
+        this_thread::sleep_for(chrono::seconds(maxIdleTime_));
+        //获取锁
+        unique_lock<mutex> lock(queueMutex_);
+        //扫描连接
+        while(connectionCount_ > initSize_){
+            Connection *conn = connectionQueue_.front();
+            if(conn->getAliveTime() >= (maxIdleTime_ * 1000)){
+                connectionQueue_.pop();
+                connectionCount_--;
+                LOG("sanner a timeout connection");
+                delete conn;
+            }
+            else{
+                //队头连接未超时，剩下的显然不用考虑，直接跳出循环
+                break;
+            }
+        }
+    }
 }

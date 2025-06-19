@@ -24,13 +24,12 @@ public:
 private:
     // 单例模式,私有化构造函数，
     ConnectionPool();
-    ~ConnectionPool();
     // 从配置文件中加载配置项
     bool loadConfigFile(); 
     // 创建数据库连接,运行在独立的线程之中
     void produceConnectionTask();
-    void init(string url, string user, string password, string dbname, int port, int maxConn);
-    Connection *getFreeConnection();
+    //扫描连接池，释放空闲连接
+    void scannerConnectionTask();
 
 private:
     static ConnectionPool *pool;

@@ -3,6 +3,7 @@
 #include <mysql/mysql.h>
 #include <string>
 #include <iostream>
+#include <ctime>
 
 using namespace std;
 
@@ -18,6 +19,11 @@ class Connection{
     bool update(string sql);
     //查询数据
     MYSQL_RES *query(string sql);
+    //刷新连接起始时间
+    void refreshAliveTime() { aliveTime_ = clock(); }
+    //获取连接存活时间
+    clock_t getAliveTime() const { return clock() - aliveTime_; }
 private:
     MYSQL *conn_; //数据库连接句柄
+    clock_t aliveTime_; //记录进入空闲状态后的存活时间
 };
