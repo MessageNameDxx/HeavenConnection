@@ -11,7 +11,8 @@ ConnectionPool* ConnectionPool::getConnectionPool(){
 
 bool ConnectionPool::loadConfigFile(){
     //创建一个配置文件对象
-    FILE *fp = fopen("mysql.cnf", "r");
+    string configPath = "/home/dxx/HeavenConnection/mysql.cnf"; // 绝对路径
+    FILE *fp = fopen(configPath.c_str(), "r");
     if (fp == nullptr){
         LOG("mysql.cnf open error");
         return false;
@@ -41,7 +42,7 @@ bool ConnectionPool::loadConfigFile(){
         else if(key == "password"){
             password_ = value;
         }
-        else if(key == "dbname"){
+        else if(key == "database"){
             dbname_ = value;
         }
         else if(key == "initSize"){

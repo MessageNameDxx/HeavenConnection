@@ -16,14 +16,14 @@ Connection::~Connection(){
 
 bool Connection::connect(string ip, unsigned short port, string user, string password, string dbname){
     // 连接数据库
-    MYSQL *conn = mysql_real_connect(conn_, ip.c_str(), user.c_str(), password.c_str(), dbname.c_str(), port, nullptr, 0);
-    return conn != nullptr;
+    conn_ = mysql_real_connect(conn_, ip.c_str(), user.c_str(), password.c_str(), dbname.c_str(), port, nullptr, 0);
+    return conn_ != nullptr;
 }
 
 bool Connection::update(string sql){
     // 执行sql语句 -- 更新语句
     if(mysql_query(conn_, sql.c_str())){
-        LOG("update error:" + sql)
+        LOG("update error:" << sql << " -- MySQL Error: " << mysql_error(conn_));
         return false;
     }
     return true;
